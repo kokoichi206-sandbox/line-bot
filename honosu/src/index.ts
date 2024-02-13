@@ -1,32 +1,56 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import { MessageAPIResponseBase, TextMessage, WebhookEvent } from '@line/bot-sdk';
+import { Hono } from 'hono';
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
-}
+const app = new Hono();
 
-export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
-	},
+app.get('*', (c) => c.text('Hi !!'));
+
+app.post('/api/webhook', async (c) => {
+	const data = await c.req.json();
+	const events: WebhookEvent[] = (data as any).events;
+
+	// @ts-ignore
+	const accessToken: string = c.env.CHANNEL_ACCESS_TOKEN;
+
+	await Promise.all(
+		events.map(async (event: WebhookEvent) => {
+			try {
+				await textEventHandler(event, accessToken);
+			} catch (err: unknown) {
+				if (err instanceof Error) {
+					console.error(err);
+				}
+				return c.json({
+					status: 'error',
+				});
+			}
+		})
+	);
+	return c.json({ message: 'ok' });
+});
+
+const textEventHandler = async (event: WebhookEvent, accessToken: string): Promise<MessageAPIResponseBase | undefined> => {
+	if (event.type !== 'message' || event.message.type !== 'text') {
+		return;
+	}
+
+	const { replyToken } = event;
+	const { text } = event.message;
+	const response: TextMessage = {
+		type: 'text',
+		text,
+	};
+	await fetch('https://api.line.me/v2/bot/message/reply', {
+		body: JSON.stringify({
+			replyToken: replyToken,
+			messages: [response],
+		}),
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${accessToken}`,
+			'Content-Type': 'application/json',
+		},
+	});
 };
+
+export default app;
