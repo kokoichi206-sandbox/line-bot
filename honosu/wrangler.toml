@@ -2,6 +2,11 @@ name = "honosu"
 main = "src/index.ts"
 compatibility_date = "2024-02-08"
 
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "line-bot"
+database_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
 # Variable bindings. These are arbitrary, plaintext strings (similar to environment variables)
 # Note: Use secrets to store sensitive data.
 # Docs: https://developers.cloudflare.com/workers/platform/environment-variables
